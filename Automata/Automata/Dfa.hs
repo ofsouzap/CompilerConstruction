@@ -8,33 +8,32 @@ import Test.QuickCheck
   , CoArbitrary
   , Gen
   , arbitrary
-  , coarbitrary
-  , elements )
+  , coarbitrary )
 
 -- Types
 
-newtype DfaConfig s = DfaConfig s
+newtype Bounded s => DfaConfig s = DfaConfig s
   deriving (Eq, Show)
 
-data Dfa s c = Dfa {
+data Bounded s => Dfa s c = Dfa {
     dfaInitial :: DfaConfig s
   , dfaTransition :: c -> DfaConfig s -> DfaConfig s
   , dfaStateAccept :: s -> Bool }
 
 -- Basic instances
 
-instance (Show s, Show c) => Show (Dfa s c) where
+instance (Bounded s, Show s) => Show (Dfa s c) where
   show dfa = "DFA[init=" ++ show (dfaInitial dfa) ++ "]"
 
 -- Arbitrary instances
 
-instance CoArbitrary s => CoArbitrary (DfaConfig s) where
+instance (Bounded s, CoArbitrary s) => CoArbitrary (DfaConfig s) where
   coarbitrary (DfaConfig s) = coarbitrary s
 
-instance Arbitrary s => Arbitrary (DfaConfig s) where
+instance (Bounded s, Arbitrary s) => Arbitrary (DfaConfig s) where
   arbitrary = DfaConfig <$> arbitrary
 
-instance (Arbitrary s, Arbitrary c, CoArbitrary s, CoArbitrary c) => Arbitrary (Dfa s c) where
+instance (Bounded s, Arbitrary s, Arbitrary c, CoArbitrary s, CoArbitrary c) => Arbitrary (Dfa s c) where
   arbitrary = do
     init <- arbitrary
     transition <- arbitrary
@@ -47,5 +46,5 @@ instance (Arbitrary s, Arbitrary c, CoArbitrary s, CoArbitrary c) => Arbitrary (
 
 -- Functions
 
-consume :: Foldable t => Dfa s c -> DfaConfig s -> t c -> DfaConfig s
+consume :: (Bounded s, Foldable t) => Dfa s c -> DfaConfig s -> t c -> DfaConfig s
 consume = foldr . dfaTransition
