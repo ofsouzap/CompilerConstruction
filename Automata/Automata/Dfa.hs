@@ -60,8 +60,8 @@ instance (CoArbitrary s, Arbitrary l, CoArbitrary l) => Arbitrary (Dfa s l) wher
         stateLabel = l
       , stateTransition = d l
       , stateAccepting = arbDfaHelperAccept helper l }
-    let helperDelta x0 s = arbDfaHelperDelta helper s x0
-    let delta s l = helperState delta (helperDelta s l)
+    let helperDelta x s = arbDfaHelperDelta helper s x
+    let delta l s = helperState delta (helperDelta l s)
     return (Dfa ( helperState delta initLabel ))
 
 -- Functions

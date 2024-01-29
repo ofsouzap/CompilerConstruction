@@ -1,10 +1,15 @@
 module Automata.Nfa
   ( Nfa(..)
   , NfaConfig(..)
+  , configTransition
+  , NfaState(..)
   , consume ) where
 
 import Data.Set
-  ( Set(..) )
+  ( Set(..)
+  , empty
+  , union
+  , map )
 import Test.QuickCheck
   ( Arbitrary
   , CoArbitrary
@@ -14,39 +19,66 @@ import Test.QuickCheck
 
 -- Types
 
-newtype Bounded s => NfaConfig s = NfaConfig (Set s)
-  deriving (Eq, Show)
+data NfaState s l = NfaState
+  { stateLabel :: l
+  , stateTransition :: s -> Set (NfaState s l)
+  , stateAccepting :: Bool }
 
-data Bounded s => Nfa s c = Nfa {
-    nfaInitial :: s
-  , nfaTransition :: c -> NfaConfig s -> NfaConfig s
-  , nfaStateAccept :: s -> Bool }
+newtype NfaConfig s l = NfaConfig (Set (NfaState s l))
+  deriving Show
+
+configTransition :: Ord l => NfaConfig s l -> s -> NfaConfig s l
+configTransition (NfaConfig xs) s = NfaConfig ( foldr
+  ( union . flip stateTransition s )
+  empty
+  xs )
+
+newtype Nfa s l = Nfa (NfaState s l)
 
 -- Basic instances
 
-instance (Bounded s, Show s) => Show (Nfa s c) where
-  show nfa = "NFA[init=" ++ show (nfaInitial nfa) ++ "]"
+instance Show l => Show (NfaState s l) where
+  show = show . stateLabel
+
+instance Eq l => Eq (NfaState s l) where
+  x1 == x2 = stateLabel x1 == stateLabel x2
+
+instance Ord l => Ord (NfaState s l) where
+  x1 `compare` x2 = stateLabel x1 `compare` stateLabel x2
+
+instance Show l => Show (Nfa s l) where
+  show (Nfa nfa) = "NFA[init=" ++ show nfa ++ "]"
 
 -- Arbitrary instances
 
-instance (Bounded s, CoArbitrary s) => CoArbitrary (NfaConfig s) where
-  coarbitrary (NfaConfig s) = coarbitrary s
+data ArbitraryNfaHelper s l = ArbitraryNfaHelper
+  { arbNfaHelperInit :: l
+  , arbNfaHelperDelta :: s -> l -> Set l
+  , arbNfaHelperAccept :: l -> Bool }
 
-instance (Ord s, Bounded s, Arbitrary s) => Arbitrary (NfaConfig s) where
-  arbitrary = NfaConfig <$> arbitrary
-
-instance (Ord s, Bounded s, Arbitrary s, Arbitrary c, CoArbitrary s, CoArbitrary c) => Arbitrary (Nfa s c) where
+instance (Ord l, CoArbitrary s, Arbitrary l, CoArbitrary l) => Arbitrary (ArbitraryNfaHelper s l) where
   arbitrary = do
     init <- arbitrary
-    transition <- arbitrary
+    delta <- arbitrary
     accept <- arbitrary
-    return $ Nfa
-      { nfaInitial = init
-      , nfaTransition = transition
-      , nfaStateAccept = accept
-      }
+    return (ArbitraryNfaHelper
+      { arbNfaHelperInit = init
+      , arbNfaHelperDelta = delta
+      , arbNfaHelperAccept = accept } )
+
+instance (Ord l, CoArbitrary s, Arbitrary l, CoArbitrary l) => Arbitrary (Nfa s l) where
+  arbitrary = do
+    helper <- arbitrary
+    let initLabel = arbNfaHelperInit helper
+    let helperState d l = NfaState {
+        stateLabel = l
+      , stateTransition = d l
+      , stateAccepting = arbNfaHelperAccept helper l }
+    let helperDelta x s = arbNfaHelperDelta helper s x
+    let delta x s = Data.Set.map (helperState delta) (helperDelta x s)
+    return (Nfa ( helperState delta initLabel ))
 
 -- Functions
 
-consume :: (Bounded s, Foldable t) => Nfa s c -> NfaConfig s -> t c -> NfaConfig s
-consume = foldr . nfaTransition
+consume :: (Ord l, Foldable t) => NfaConfig s l -> t s -> NfaConfig s l
+consume = foldr (flip configTransition)
