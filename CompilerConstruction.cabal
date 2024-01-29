@@ -14,7 +14,8 @@ library
     default-language: Haskell2010
 
 library Automata
-    exposed-modules:  Automata.Dfa,
+    exposed-modules:  Automata.Internal,
+                      Automata.Dfa,
                       Automata.Nfa
     build-depends:    base ^>=4.16.4.0,
                       containers,
@@ -24,7 +25,8 @@ library Automata
 
 test-suite TestAutomata
     main-is:          Main.hs
-    other-modules:    DfaTests
+    other-modules:    InternalTests,
+                      DfaTests,
                       NfaTests
     build-depends:    base ^>=4.16.4.0,
                       containers,
