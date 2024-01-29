@@ -19,6 +19,6 @@ compareConfigLabel (NfaConfig s1) (NfaConfig s2) = s1 == s2
 spec =
   describe "NFA" $ do
     it "should consume a single symbol sequence correctly" $ property $
-      \ ((Nfa inits) :: Nfa Char String, c :: Char) ->
-        let initConfig = NfaConfig inits in
+      \ ((Nfa init) :: Nfa Char String, c :: Char) ->
+        let initConfig = NfaConfig (singleton init) in
           configTransition initConfig c `compareConfigLabel` consume initConfig [c]

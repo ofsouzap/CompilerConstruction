@@ -8,6 +8,7 @@ module Automata.Dfa
 import Test.QuickCheck
   ( Arbitrary
   , CoArbitrary
+  , Gen
   , arbitrary
   , coarbitrary )
 
@@ -62,8 +63,6 @@ instance (CoArbitrary s, Arbitrary l, CoArbitrary l) => Arbitrary (Dfa s l) wher
     let helperDelta x s = arbDfaHelperDelta helper s x
     let delta l s = helperState delta (helperDelta l s)
     return (Dfa ( helperState delta initLabel ))
-
--- TODO - could make functor instance for NFA for manipulating values of labels
 
 -- Functions
 
