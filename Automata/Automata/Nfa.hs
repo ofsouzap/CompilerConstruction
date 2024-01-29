@@ -13,7 +13,6 @@ import Data.Set
 import Test.QuickCheck
   ( Arbitrary
   , CoArbitrary
-  , Gen
   , arbitrary
   , coarbitrary )
 
@@ -33,7 +32,7 @@ configTransition (NfaConfig xs) s = NfaConfig ( foldr
   empty
   xs )
 
-newtype Nfa s l = Nfa (NfaState s l)
+newtype Nfa s l = Nfa (Set (NfaState s l))
 
 -- Basic instances
 
@@ -52,7 +51,7 @@ instance Show l => Show (Nfa s l) where
 -- Arbitrary instances
 
 data ArbitraryNfaHelper s l = ArbitraryNfaHelper
-  { arbNfaHelperInit :: l
+  { arbNfaHelperInit :: Set l
   , arbNfaHelperDelta :: s -> l -> Set l
   , arbNfaHelperAccept :: l -> Bool }
 
@@ -69,14 +68,16 @@ instance (Ord l, CoArbitrary s, Arbitrary l, CoArbitrary l) => Arbitrary (Arbitr
 instance (Ord l, CoArbitrary s, Arbitrary l, CoArbitrary l) => Arbitrary (Nfa s l) where
   arbitrary = do
     helper <- arbitrary
-    let initLabel = arbNfaHelperInit helper
+    let initLabels = arbNfaHelperInit helper
     let helperState d l = NfaState {
         stateLabel = l
       , stateTransition = d l
       , stateAccepting = arbNfaHelperAccept helper l }
     let helperDelta x s = arbNfaHelperDelta helper s x
     let delta x s = Data.Set.map (helperState delta) (helperDelta x s)
-    return (Nfa ( helperState delta initLabel ))
+    return (Nfa ( Data.Set.map (helperState delta) initLabels ))
+
+-- TODO - could make functor instance for DFA for manipulating values of labels
 
 -- Functions
 
