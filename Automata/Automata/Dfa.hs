@@ -1,6 +1,8 @@
 module Automata.Dfa
   ( Dfa(..)
   , DfaConfig(..)
+  , configTransition
+  , DfaState(..)
   , consume ) where
 
 import Test.QuickCheck
@@ -12,39 +14,57 @@ import Test.QuickCheck
 
 -- Types
 
-newtype Bounded s => DfaConfig s = DfaConfig s
-  deriving (Eq, Show)
+data DfaState s l = DfaState
+  { stateLabel :: l
+  , stateTransition :: s -> DfaState s l
+  , stateAccepting :: Bool }
 
-data Bounded s => Dfa s c = Dfa {
-    dfaInitial :: DfaConfig s
-  , dfaTransition :: c -> DfaConfig s -> DfaConfig s
-  , dfaStateAccept :: s -> Bool }
+newtype DfaConfig s l = DfaConfig (DfaState s l)
+  deriving Show
+
+configTransition :: DfaConfig s l -> s -> DfaConfig s l
+configTransition (DfaConfig x) = DfaConfig . stateTransition x
+
+newtype Dfa s l = Dfa (DfaState s l)
 
 -- Basic instances
 
-instance (Bounded s, Show s) => Show (Dfa s c) where
-  show dfa = "DFA[init=" ++ show (dfaInitial dfa) ++ "]"
+instance Show l => Show (DfaState s l) where
+  show = show . stateLabel
+
+instance Show l => Show (Dfa s l) where
+  show (Dfa dfa) = "DFA[init=" ++ show dfa ++ "]"
 
 -- Arbitrary instances
 
-instance (Bounded s, CoArbitrary s) => CoArbitrary (DfaConfig s) where
-  coarbitrary (DfaConfig s) = coarbitrary s
+data ArbitraryDfaHelper s l = ArbitraryDfaHelper
+  { arbDfaHelperInit :: l
+  , arbDfaHelperDelta :: s -> l -> l
+  , arbDfaHelperAccept :: l -> Bool }
 
-instance (Bounded s, Arbitrary s) => Arbitrary (DfaConfig s) where
-  arbitrary = DfaConfig <$> arbitrary
-
-instance (Bounded s, Arbitrary s, Arbitrary c, CoArbitrary s, CoArbitrary c) => Arbitrary (Dfa s c) where
+instance (CoArbitrary s, Arbitrary l, CoArbitrary l) => Arbitrary (ArbitraryDfaHelper s l) where
   arbitrary = do
     init <- arbitrary
-    transition <- arbitrary
+    delta <- arbitrary
     accept <- arbitrary
-    return $ Dfa
-      { dfaInitial = init
-      , dfaTransition = transition
-      , dfaStateAccept = accept
-      }
+    return (ArbitraryDfaHelper
+      { arbDfaHelperInit = init
+      , arbDfaHelperDelta = delta
+      , arbDfaHelperAccept = accept } )
+
+instance (CoArbitrary s, Arbitrary l, CoArbitrary l) => Arbitrary (Dfa s l) where
+  arbitrary = do
+    helper <- arbitrary
+    let initLabel = arbDfaHelperInit helper
+    let helperState d l = DfaState {
+        stateLabel = l
+      , stateTransition = d l
+      , stateAccepting = arbDfaHelperAccept helper l }
+    let helperDelta x0 s = arbDfaHelperDelta helper s x0
+    let delta s l = helperState delta (helperDelta s l)
+    return (Dfa ( helperState delta initLabel ))
 
 -- Functions
 
-consume :: (Bounded s, Foldable t) => Dfa s c -> DfaConfig s -> t c -> DfaConfig s
-consume = foldr . dfaTransition
+consume :: (Foldable t) => DfaConfig s l -> t s -> DfaConfig s l
+consume = foldr (flip configTransition)

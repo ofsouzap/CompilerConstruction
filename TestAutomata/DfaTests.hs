@@ -11,8 +11,12 @@ import Test.QuickCheck
   ( property )
 import Automata.Dfa
 
+compareConfigLabel :: Eq l => DfaConfig s l -> DfaConfig s l -> Bool
+compareConfigLabel (DfaConfig s1) (DfaConfig s2) = stateLabel s1 == stateLabel s2
+
 spec =
   describe "DFA" $ do
     it "should consume a single symbol sequence correctly" $ property $
-      \ (dfa :: Dfa Int Char, init :: DfaConfig Int, c :: Char) ->
-        dfaTransition dfa c init == consume dfa init [c]
+      \ ((Dfa init) :: Dfa Char String, c :: Char) ->
+        let initConfig = DfaConfig init in
+          configTransition initConfig c `compareConfigLabel` consume initConfig [c]
