@@ -68,44 +68,51 @@ instance Show l => Show (Nfa s l) where
 -- NFA Builder
 
 data NfaBuilderHelper s l = NfaBuilderHelper
-  { arbNfaHelperInit :: l
-  , arbNfaHelperEpsDelta :: l -> Set l
-  , arbNfaHelperDelta :: s -> l -> Set l
-  , arbNfaHelperAccept :: l -> Bool }
+  { nfaBuilderHelperInit :: l
+  , nfaBuilderHelperEpsDelta :: l -> Set l
+  , nfaBuilderHelperDelta :: s -> l -> Set l
+  , nfaBuilderHelperAccept :: l -> Bool }
 
 nfaBuilderEpsClosure :: Ord l => NfaBuilderHelper s l -> l -> Set l
-nfaBuilderEpsClosure h = computeClosure (arbNfaHelperEpsDelta h) . Set.singleton
+nfaBuilderEpsClosure h = computeClosure (nfaBuilderHelperEpsDelta h) . Set.singleton
+
+buildWithHelper :: Ord l => NfaBuilderHelper s l -> Nfa s l
+buildWithHelper helper =
+  (Nfa . helperState helper) (initLabel helper) where
+    initLabel = nfaBuilderHelperInit
+    helperState h l = NfaState
+      { stateLabel = l
+      , stateEpsTransitions = closedEpsDelta h l
+      , stateDirectTransition = delta h l
+      , stateAccepting = nfaBuilderHelperAccept h l }
+    closedEpsDelta h l = Set.map (helperState h) (nfaBuilderEpsClosure h l)
+    delta h l s = Set.map (helperState h) (nfaBuilderHelperDelta h s l)
 
 -- Arbitrary instances
 
-instance (Ord l, CoArbitrary s, Arbitrary l, CoArbitrary l) => Arbitrary (NfaBuilderHelper s l) where
+newtype ArbNoEpsHelper s l = ArbNoEpsHelper (NfaBuilderHelper s l)
+
+unwrapArbNoEpsHelper :: ArbNoEpsHelper s l -> NfaBuilderHelper s l
+unwrapArbNoEpsHelper (ArbNoEpsHelper x) = x
+
+instance (Ord l, CoArbitrary s, Arbitrary l, CoArbitrary l) => Arbitrary (ArbNoEpsHelper s l) where
   arbitrary = do
     ini <- arbitrary
     let epsDelta = const empty
     delta <- arbitrary
     accept <- arbitrary
-    return (NfaBuilderHelper
-      { arbNfaHelperInit = ini
-      , arbNfaHelperEpsDelta = epsDelta
-      , arbNfaHelperDelta = delta
-      , arbNfaHelperAccept = accept } )
+    (return . ArbNoEpsHelper) (NfaBuilderHelper
+      { nfaBuilderHelperInit = ini
+      , nfaBuilderHelperEpsDelta = epsDelta
+      , nfaBuilderHelperDelta = delta
+      , nfaBuilderHelperAccept = accept } )
 
 -- | Wrapper for NFA that doesn't use epsilon transitions
 newtype NoEpsNfa s l = NoEpsNfa (Nfa s l)
   deriving ( Show )
 
 instance (Ord l, CoArbitrary s, Arbitrary l, CoArbitrary l) => Arbitrary (NoEpsNfa s l) where
-  arbitrary = do
-    helper <- arbitrary
-    (return . NoEpsNfa . Nfa . helperState helper) (initLabel helper) where
-      initLabel = arbNfaHelperInit
-      helperState h l = NfaState
-        { stateLabel = l
-        , stateEpsTransitions = closedEpsDelta h l
-        , stateDirectTransition = delta h l
-        , stateAccepting = arbNfaHelperAccept h l }
-      closedEpsDelta h l = Set.map (helperState h) (nfaBuilderEpsClosure h l)
-      delta h l s = Set.map (helperState h) (arbNfaHelperDelta h s l)
+  arbitrary = NoEpsNfa . buildWithHelper . unwrapArbNoEpsHelper <$> arbitrary
 
 -- Functions
 
