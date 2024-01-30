@@ -12,6 +12,7 @@ library
                       Automata
     hs-source-dirs:   CompilerConstruction
     default-language: Haskell2010
+    ghc-options:      -Wall
 
 library Automata
     exposed-modules:  Automata.Internal,
@@ -22,10 +23,12 @@ library Automata
                       QuickCheck
     hs-source-dirs:   Automata
     default-language: Haskell2010
+    ghc-options:      -Wall
 
 test-suite TestAutomata
     main-is:          Main.hs
-    other-modules:    InternalTests,
+    other-modules:    Utils,
+                      InternalTests,
                       DfaTests,
                       NfaTests
     build-depends:    base ^>=4.16.4.0,
@@ -38,3 +41,4 @@ test-suite TestAutomata
     hs-source-dirs:   TestAutomata
     type:             exitcode-stdio-1.0
     default-language: Haskell2010
+    ghc-options:      -Wall

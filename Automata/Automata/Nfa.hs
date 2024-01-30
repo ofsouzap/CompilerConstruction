@@ -1,39 +1,55 @@
 module Automata.Nfa
   ( Nfa(..)
   , NfaConfig(..)
+  , nfaInitialConfig
   , configTransition
   , NfaState(..)
-  , consume ) where
+  , consume
+  , NfaBuilderHelper(..)
+  , NoEpsNfa(..) ) where
 
 import Data.Set
-  ( Set(..)
+  ( Set
   , empty
-  , union
-  , map )
+  , union )
+import qualified Data.Set as Set
+  ( map
+  , singleton )
 import Test.QuickCheck
   ( Arbitrary
   , CoArbitrary
-  , Gen
-  , arbitrary
-  , coarbitrary )
+  , arbitrary )
+import Automata.Internal
+  ( computeClosure )
 
 -- Types
 
 data NfaState s l = NfaState
   { stateLabel :: l
-  , stateTransition :: s -> Set (NfaState s l)
+  , stateEpsTransitions :: Set (NfaState s l)
+  , stateDirectTransition :: s -> Set (NfaState s l)
   , stateAccepting :: Bool }
+
+stateEpsClosure :: Ord l => NfaState s l -> Set (NfaState s l)
+stateEpsClosure = computeClosure stateEpsTransitions . Set.singleton -- TODO - this doesn't terminate when testing
+
+stateFullTransition :: Ord l => NfaState s l -> s -> Set (NfaState s l)
+stateFullTransition state = foldr (union . Set.singleton) empty . stateDirectTransition state
+-- stateFullTransition state = foldr (union . stateEpsClosure) empty . stateDirectTransition state
 
 newtype NfaConfig s l = NfaConfig (Set (NfaState s l))
   deriving Show
 
 configTransition :: Ord l => NfaConfig s l -> s -> NfaConfig s l
 configTransition (NfaConfig xs) s = NfaConfig ( foldr
-  ( union . flip stateTransition s )
+  ( union . flip stateFullTransition s )
   empty
   xs )
 
 newtype Nfa s l = Nfa (NfaState s l)
+
+nfaInitialConfig :: Ord l => Nfa s l -> NfaConfig s l
+nfaInitialConfig (Nfa state) = NfaConfig (stateEpsClosure state)
 
 -- Basic instances
 
@@ -49,34 +65,47 @@ instance Ord l => Ord (NfaState s l) where
 instance Show l => Show (Nfa s l) where
   show (Nfa nfa) = "NFA[init=" ++ show nfa ++ "]"
 
--- Arbitrary instances
+-- NFA Builder
 
-data ArbitraryNfaHelper s l = ArbitraryNfaHelper
+data NfaBuilderHelper s l = NfaBuilderHelper
   { arbNfaHelperInit :: l
+  , arbNfaHelperEpsDelta :: l -> Set l
   , arbNfaHelperDelta :: s -> l -> Set l
   , arbNfaHelperAccept :: l -> Bool }
 
-instance (Ord l, CoArbitrary s, Arbitrary l, CoArbitrary l) => Arbitrary (ArbitraryNfaHelper s l) where
+nfaBuilderEpsClosure :: Ord l => NfaBuilderHelper s l -> l -> Set l
+nfaBuilderEpsClosure h = computeClosure (arbNfaHelperEpsDelta h) . Set.singleton
+
+-- Arbitrary instances
+
+instance (Ord l, CoArbitrary s, Arbitrary l, CoArbitrary l) => Arbitrary (NfaBuilderHelper s l) where
   arbitrary = do
-    init <- arbitrary
+    ini <- arbitrary
+    let epsDelta = const empty
     delta <- arbitrary
     accept <- arbitrary
-    return (ArbitraryNfaHelper
-      { arbNfaHelperInit = init
+    return (NfaBuilderHelper
+      { arbNfaHelperInit = ini
+      , arbNfaHelperEpsDelta = epsDelta
       , arbNfaHelperDelta = delta
       , arbNfaHelperAccept = accept } )
 
-instance (Ord l, CoArbitrary s, Arbitrary l, CoArbitrary l) => Arbitrary (Nfa s l) where
+-- | Wrapper for NFA that doesn't use epsilon transitions
+newtype NoEpsNfa s l = NoEpsNfa (Nfa s l)
+  deriving ( Show )
+
+instance (Ord l, CoArbitrary s, Arbitrary l, CoArbitrary l) => Arbitrary (NoEpsNfa s l) where
   arbitrary = do
     helper <- arbitrary
-    let initLabel = arbNfaHelperInit helper
-    let helperState d l = NfaState {
-        stateLabel = l
-      , stateTransition = d l
-      , stateAccepting = arbNfaHelperAccept helper l }
-    let helperDelta x s = arbNfaHelperDelta helper s x
-    let delta x s = Data.Set.map (helperState delta) (helperDelta x s)
-    return (Nfa ( helperState delta initLabel ))
+    (return . NoEpsNfa . Nfa . helperState helper) (initLabel helper) where
+      initLabel = arbNfaHelperInit
+      helperState h l = NfaState
+        { stateLabel = l
+        , stateEpsTransitions = closedEpsDelta h l
+        , stateDirectTransition = delta h l
+        , stateAccepting = arbNfaHelperAccept h l }
+      closedEpsDelta h l = Set.map (helperState h) (nfaBuilderEpsClosure h l)
+      delta h l s = Set.map (helperState h) (arbNfaHelperDelta h s l)
 
 -- Functions
 

@@ -1,5 +1,6 @@
 {-# LANGUAGE ScopedTypeVariables #-}
-module InternalTests where
+module InternalTests
+  ( spec ) where
 
 import Data.Set
   ( Set
@@ -9,10 +10,8 @@ import Data.Set
   , insert )
 import Test.Hspec
   ( Spec
-  , hspec
   , describe
-  , it
-  , shouldBe )
+  , it )
 import Test.QuickCheck
   ( property
   , Arbitrary
@@ -39,12 +38,15 @@ ltTotalClosureF Four = singleton One
 ltTotalClosureSet :: Set LimitedThing
 ltTotalClosureSet = fromList [One, Two, Three, Four]
 
+spec :: Spec
 spec =
   describe "Internal" $ do
     describe "compute closure" $ do
-      it "should have singleton closure for no-relations starting with singleton" $ property $
-        \ (x :: Int) -> computeClosure (const empty) (singleton x) == singleton x
-      it "should have idenity closure for no-relations" $ property $
+      it "should have identity closure for no-relations" $ property $
         \ (xs :: Set Int) -> computeClosure (const empty) xs == xs
+      it "should have identity closure for identity relations" $ property $
+        \ (xs :: Set Int) -> computeClosure singleton xs == xs
       it "should give total closure for the \"LimitedThing\" closed set" $ property $
         \ (xs' :: Set LimitedThing, x :: LimitedThing) -> computeClosure ltTotalClosureF (insert x xs') == ltTotalClosureSet
+      it "should give the predecessors for the natural number predessor closure" $ property $
+        \ (x :: Natural) -> ((naturalToInteger x + 1 ==) . toInteger . length . computeClosure (singleton . naturalPredOrZero) . singleton) x
