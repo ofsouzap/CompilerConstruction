@@ -12,7 +12,7 @@ library
                       Automata
     hs-source-dirs:   CompilerConstruction
     default-language: Haskell2010
-    ghc-options:      -Wall
+    ghc-options:      -Wall -Wno-unused-top-binds
 
 library Automata
     exposed-modules:  Automata.Internal,
@@ -23,7 +23,7 @@ library Automata
                       QuickCheck
     hs-source-dirs:   Automata
     default-language: Haskell2010
-    ghc-options:      -Wall
+    ghc-options:      -Wall -Wno-unused-top-binds
 
 test-suite TestAutomata
     main-is:          Main.hs
@@ -41,4 +41,4 @@ test-suite TestAutomata
     hs-source-dirs:   TestAutomata
     type:             exitcode-stdio-1.0
     default-language: Haskell2010
-    ghc-options:      -Wall
+    ghc-options:      -Wall -Wno-unused-top-binds
