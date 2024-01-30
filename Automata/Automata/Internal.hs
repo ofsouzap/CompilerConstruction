@@ -1,6 +1,7 @@
 module Automata.Internal
   ( computeClosure
   , Natural(..)
+  , naturalSucc
   , naturalPredOrZero
   , naturalFromInteger
   , naturalToInteger ) where
@@ -42,6 +43,9 @@ naturalFromInteger = Natural . GHCNat.naturalFromInteger
 
 naturalToInteger :: Natural -> Integer
 naturalToInteger (Natural n) = GHCNat.naturalToInteger n
+
+naturalSucc :: Natural -> Natural
+naturalSucc (Natural n) = (Natural . succ) n
 
 naturalPredOrZero :: Natural -> Natural
 naturalPredOrZero (Natural 0) = Natural 0

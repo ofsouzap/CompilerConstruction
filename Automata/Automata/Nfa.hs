@@ -1,11 +1,13 @@
 module Automata.Nfa
   ( Nfa(..)
+  , NfaState(..)
+  , stateEpsClosure
   , NfaConfig(..)
   , nfaInitialConfig
   , configTransition
-  , NfaState(..)
   , consume
   , NfaBuilderHelper(..)
+  , buildWithHelper
   , NoEpsNfa(..) ) where
 
 import Data.Set
@@ -31,20 +33,20 @@ data NfaState s l = NfaState
   , stateAccepting :: Bool }
 
 stateEpsClosure :: Ord l => NfaState s l -> Set (NfaState s l)
-stateEpsClosure = computeClosure stateEpsTransitions . Set.singleton -- TODO - this doesn't terminate when testing
+stateEpsClosure = computeClosure stateEpsTransitions . Set.singleton
 
 stateFullTransition :: Ord l => NfaState s l -> s -> Set (NfaState s l)
-stateFullTransition state = foldr (union . Set.singleton) empty . stateDirectTransition state
--- stateFullTransition state = foldr (union . stateEpsClosure) empty . stateDirectTransition state
+stateFullTransition state = foldr (union . stateEpsClosure) empty . stateDirectTransition state
 
 newtype NfaConfig s l = NfaConfig (Set (NfaState s l))
   deriving Show
 
 configTransition :: Ord l => NfaConfig s l -> s -> NfaConfig s l
-configTransition (NfaConfig xs) s = NfaConfig ( foldr
+configTransition (NfaConfig xs') s = NfaConfig ( foldr
   ( union . flip stateFullTransition s )
   empty
-  xs )
+  xs ) where
+    xs = foldr (union . stateEpsClosure) empty xs' -- Make sure to apply epsilon transitions for starting configuration
 
 newtype Nfa s l = Nfa (NfaState s l)
 
