@@ -1,0 +1,49 @@
+name: OCaml Dune CI
+
+on:
+  push:
+    branches: [ "main", "change-to-ocaml" ]
+  pull_request:
+    branches: [ "main", "change-to-ocaml" ]
+
+permissions:
+  contents:
+    read
+
+jobs:
+  build:
+
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+        ocaml-compiler:
+          - "4.13"
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - name: Checkout tree
+      uses: actions/checkout@v4
+
+    - name: Checkout nicelib
+      uses: actions/checkout@v4
+      with:
+        repository: ofsouzap/ocaml-nicelib
+        path: nicelib
+
+    - name: Set-up OCaml ${{ matrix.ocaml-compiler }}
+      uses: ocaml/setup-ocaml@v2
+      with:
+        ocaml-compiler: ${{ matrix.ocaml-compiler }}
+        opam-local-packages: "nicelib/*.opam *.opam"
+
+    - name: Install nicelib
+      working-directory: ./nicelib
+      run: opam install .
+
+    - run: opam install . --deps-only --with-test
+
+    - run: opam exec -- dune build
+
+    - run: opam exec -- dune runtest

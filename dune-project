@@ -5,7 +5,7 @@
 (generate_opam_files true)
 
 (source
- (github ofsouzap/CompilerConstruction))
+ (github Ofsouzap/CompilerConstruction))
 
 (authors "Ofsouzap")
 
@@ -14,4 +14,4 @@
 (package
  (name CompilerConstruction)
  (synopsis "Compiler construction code stuff")
- (depends ocaml dune))
+ (depends ocaml dune alcotest nicelib fmt qcheck qcheck-alcotest))
